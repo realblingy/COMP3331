@@ -38,9 +38,6 @@ if segment['syn'] == 1:
 
     clientSocket.sendto(synAckSegement, senderAddress)
 
-print("Sequence number: " + str(sequenceNumber))
-print("Acknowledgement number: " + str(acknowledgementNumber))
-
 # Awaits ACK segment
 message, senderAddress = clientSocket.recvfrom(2048)
 
@@ -60,9 +57,12 @@ acksSent = 0;
 # Receive segments
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
-    
     segment = json.loads(message.decode('utf-8'))
+    print("Received segment")
+    print(segment)
+    print()
 
+    # Sender sends finish segment which closes the socket
     if segment['fin'] == 1:
         finAckSegment = createSegement(
             sequenceNumber,
@@ -83,9 +83,12 @@ while 1:
         break;
 
 
-    acknowledgementNumber += int(segment['length'])
-    contents += segment['payload']
-
+    # Checks if right packet is sent
+    if segment['sequenceNumber'] + 1 == acknowledgementNumber:
+        acknowledgementNumber += int(segment['length'])
+        contents += segment['payload']
+        acksSent += 1;
+    
     ackSegment = createSegement(
         sequenceNumber,
         acknowledgementNumber,
@@ -93,10 +96,6 @@ while 1:
     )
 
     clientSocket.sendto(ackSegment, senderAddress)
-
-    acksSent += 1;
-
-    # print(acksSent)
 
             
 

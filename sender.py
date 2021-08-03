@@ -63,13 +63,14 @@ if segment['syn'] == 1 and segment['ack'] == 1:
         ack = 1
     )
 
-    print("Sequence number: " + str(sequenceNumber))
-    print("Acknowledgement number: " + str(acknowledgementNumber))
-
     senderSocket.sendto(ackSegment, (receiverIP, receiverPort))
 
     segmentsSent = 0
     oldestUnack = None
+    oldestUnackSequenceNumber = None
+    oldestUnackIndex = None
+    segmentsNeededToSendCount = 0
+    receivedAcks = 0
 
     # Sends PTP segments with data
     while segmentsToSendIndex < len(segmentsToSend):
@@ -82,38 +83,60 @@ if segment['syn'] == 1 and segment['ack'] == 1:
             length=len(segmentPayload)
         )
 
-        receivedAcks = 0
+        
 
-        # # PL module
-        # if (random.random() > pdrop): 
-        #     senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
-        #     segmentsSent += 1
-        #     sequenceNumber += len(segmentPayload)
-        #     segmentsToSendIndex += 1
-        #     receivedAcks = 0
-        # else:
-        #     if oldestUnack is None:
-        #         oldestUnack = segmentsToSendIndex
-        #     elif segmentsToSendIndex < oldestUnack:  
-        #         time.sleep(timer/1000)
-        #         segmentsToSend = oldestUnack
-        #         oldestUnack = None
-        #         continue
+        # If we don't want to drop the packet
+        if (random.random() > pdrop): 
+            senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
+            segmentsSent += 1
+            print("Sending segment: ")
+            print(segmentPayload)
+            print()
+            segmentsNeededToSendCount += 1
+        # If we want to drop the packet
+        else:
+            print("Dropped segment: ")
+            print(segmentPayload)
+            print()
+            if oldestUnack is None:
+                oldestUnack = segmentsToSendIndex
+                oldestUnackSequenceNumber = sequenceNumber
+                oldestUnackIndex = segmentsToSendIndex
 
+        sequenceNumber += len(segmentPayload)
+        segmentsToSendIndex += 1
+        acksCounter = 0
         # If we reached the maximum window size, we wait for all ACKs
         if segmentsToSendIndex % (MWS) == 0:
-            while receivedAcks < MWS:
+            print(segmentsNeededToSendCount)
+            while acksCounter < segmentsNeededToSendCount:
                 message, senderAddress = senderSocket.recvfrom(2048)
 
                 ackSegment = json.loads(message.decode('utf-8'))
-                print("Received segemnet")
-                print(ackSegment)
-                print()
+                acksCounter += 1
 
                 if ackSegment['ack'] == 1:
                     receivedAcks += 1;
-            segmentsSent = 0
+
+            print(receivedAcks)
+            # Checks if all segments were received
+            # If not, go back to oldest UNACKed segment
+            if receivedAcks != MWS:
+                segmentsToSendIndex = oldestUnack
+                oldestUnack = None
+                segmentsSent = oldestUnackIndex % MWS
+                sequenceNumber = oldestUnackSequenceNumber
+                oldestUnackSequenceNumber = None
+                segmentsNeededToSendCount = MWS - segmentsSent
+            else:
+                print("Successfully sent window")
+                receivedAcks = 0
+                segmentsNeededToSendCount = 0
+                segmentsSent = 0
+        # If we reached the end 
         elif segmentsToSendIndex == len(segmentsToSend):
+            segmentsNeededToSendCount = segmentsToSendIndex % MWS
+            print("HERE?")
             while receivedAcks < segmentsSent:
                 message, senderAddress = senderSocket.recvfrom(2048)
 
@@ -124,6 +147,18 @@ if segment['syn'] == 1 and segment['ack'] == 1:
 
                 if ackSegment['ack'] == 1:
                     receivedAcks += 1;
+
+            if segmentsSent < segmentsNeededToSendCount:
+                segmentsToSendIndex = oldestUnack
+                oldestUnack = None
+                segmentsSent = oldestUnackIndex % MWS
+                sequenceNumber = oldestUnackSequenceNumber
+                oldestUnackSequenceNumber = None
+            else:
+                print("Successfully sent window")
+                receivedAcks = 0
+                segmentsNeededToSendCount = 0
+                segmentsSent = 0
 
 # Closing connection
 
