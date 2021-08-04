@@ -2,10 +2,14 @@ from ptp import createSegement
 import sys
 from socket import *
 import json
+import time
+
+startTime = time.time()
 
 if len(sys.argv) != 3:
     print("Usage python receiver.py <receiver_port> <FileReceived.txt>")
     sys.exit();
+
 
 receiverPort = int(sys.argv[1])
 fileReceived = open(sys.argv[2], "w")
@@ -13,7 +17,7 @@ fileReceived = open(sys.argv[2], "w")
 clientSocket = socket(AF_INET, SOCK_DGRAM)
 clientSocket.bind(('localhost', receiverPort))
 
-print('PTP server is ready to receive')
+# print('PTP server is ready to receive')
 
 sequenceNumber = 500
 acknowledgementNumber = None
@@ -47,19 +51,17 @@ segment = json.loads(message.decode('utf-8'))
 if segment['ack'] == 1:
     allowSending = True
     sequenceNumber += 1
-    print("A connection has been established with " + str(senderAddress))
-    print()
-    print("Initial sequence number: " + str(sequenceNumber))
-    print()
-    print("Initial acknowledgement number: " + str(acknowledgementNumber))
+    # print("A connection has been established with " + str(senderAddress))
+    # print()
+    # print("Initial sequence number: " + str(sequenceNumber))
+    # print()
+    # print("Initial acknowledgement number: " + str(acknowledgementNumber))
 
 # Receive segments
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
     segment = json.loads(message.decode('utf-8'))
-    print("Received segment")
-    print(segment)
-    print()
+
 
     # Sender sends finish segment which closes the socket
     if segment['fin'] == 1:
@@ -72,6 +74,7 @@ while 1:
 
 
         clientSocket.sendto(finAckSegment, senderAddress)
+
 
         message, senderAddress = clientSocket.recvfrom(2048)
         fileReceived.write(contents)
@@ -86,12 +89,19 @@ while 1:
     if segment['sequenceNumber'] == acknowledgementNumber:
         acknowledgementNumber += int(segment['length'])
         contents += segment['payload']
+        # print("Received segment")
+        # print(segment)
+        # print()
     
     ackSegment = createSegement(
         sequenceNumber,
         acknowledgementNumber,
         ack=1
     )
+
+    # print("Acked Segment sent")
+    # print(ackSegment)
+    # print()
 
     clientSocket.sendto(ackSegment, senderAddress)
 
