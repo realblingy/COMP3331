@@ -67,6 +67,10 @@ if segment['syn'] == 1 and segment['ack'] == 1:
 
     senderSocket.sendto(ackSegment, (receiverIP, receiverPort))
 
+    print("Initial sequence number: " + str(sequenceNumber))
+    print()
+    print("Initial acknowledgement number: " + str(acknowledgementNumber))
+
     segmentsSent = 0
     oldestUnack = None
 

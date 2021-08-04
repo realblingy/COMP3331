@@ -51,8 +51,7 @@ if segment['ack'] == 1:
     print()
     print("Initial sequence number: " + str(sequenceNumber))
     print()
-
-acksSent = 0;
+    print("Initial acknowledgement number: " + str(acknowledgementNumber))
 
 # Receive segments
 while 1:
@@ -84,10 +83,9 @@ while 1:
 
 
     # Checks if right packet is sent
-    if segment['sequenceNumber'] + 1 == acknowledgementNumber:
+    if segment['sequenceNumber'] == acknowledgementNumber:
         acknowledgementNumber += int(segment['length'])
         contents += segment['payload']
-        acksSent += 1;
     
     ackSegment = createSegement(
         sequenceNumber,
