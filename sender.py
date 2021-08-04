@@ -35,14 +35,10 @@ with open(fileToSend, "r") as f:
         payload = f.read(MSS)
     f.close()
 
-# print("Split file into segments")
-# print(segmentsToSend)
 
 senderSocket = socket(AF_INET, SOCK_DGRAM)
 senderSocket.bind((serverIP, serverPort))
 senderSocket.settimeout(timer / 1000)
-
-print('PTP client is ready to send')
 
 synSegment = createSegement(
     sequenceNumber,
@@ -92,15 +88,15 @@ if segment['syn'] == 1 and segment['ack'] == 1:
         )
 
         # PL modules
+
+        # If we do not drop the packet, we move the window
         if (random.random() > pdrop): 
-            print("Sending")
             senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
             if packetLoss == False:
                 windowStart += 1
                 packetLossSequence = sequenceNumber
                 windowEnd = min(windowEnd + 1, len(segmentsToSend))
         else:
-            print("Dropping")
             if packetLoss == False:
                 packetLossSequence = sequenceNumber
                 packetLoss = True
