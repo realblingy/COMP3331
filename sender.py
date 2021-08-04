@@ -72,8 +72,11 @@ if segment['syn'] == 1 and segment['ack'] == 1:
     print()
     print("Initial acknowledgement number: " + str(acknowledgementNumber))
 
-    segmentsSent = 0
-    oldestUnack = None
+    
+    # Starting index of window
+    windowStart = 0
+    # Number of packets sent or dropped
+    windowSize = 0
 
     # Sends PTP segments with data
     while segmentsToSendIndex < len(segmentsToSend):
@@ -87,18 +90,17 @@ if segment['syn'] == 1 and segment['ack'] == 1:
         )
 
         # PL modules
-        if (random.random() > pdrop): 
-            senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
-            segmentsSent += 1
-            sequenceNumber += len(segmentPayload)
-            segmentsToSendIndex += 1
-            receivedAcks = 0
-        else:
-            if oldestUnack is None:
-                oldestUnack = segmentsToSendIndex
+        # if (random.random() > pdrop): 
+        senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
+        sequenceNumber += len(segmentPayload)
+        print("Sent segment: " + str(segmentsToSendIndex))
+        segmentsToSendIndex += 1
+
+        windowSize += 1
 
         # If we reached the maximum window size, we wait for all ACKs
-        if segmentsToSendIndex % (MWS) == 0:
+        if windowSize == MWS:
+            receivedAcks = 0
             while receivedAcks < MWS:
                 message, senderAddress = senderSocket.recvfrom(2048)
 
@@ -109,9 +111,11 @@ if segment['syn'] == 1 and segment['ack'] == 1:
 
                 if ackSegment['ack'] == 1:
                     receivedAcks += 1;
-            segmentsSent = 0
+
+                windowSize = 0
         elif segmentsToSendIndex == len(segmentsToSend):
-            while receivedAcks < segmentsSent:
+            receivedAcks = 0
+            while receivedAcks < segmentsToSendIndex % MWS:
                 message, senderAddress = senderSocket.recvfrom(2048)
 
                 ackSegment = json.loads(message.decode('utf-8'))
@@ -121,6 +125,8 @@ if segment['syn'] == 1 and segment['ack'] == 1:
 
                 if ackSegment['ack'] == 1:
                     receivedAcks += 1;
+                
+                windowSize = 0
 
 # Closing connection
 
