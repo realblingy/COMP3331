@@ -40,6 +40,7 @@ with open(fileToSend, "r") as f:
 
 senderSocket = socket(AF_INET, SOCK_DGRAM)
 senderSocket.bind((serverIP, serverPort))
+senderSocket.settimeout(timer / 1000)
 
 print('PTP client is ready to send')
 
@@ -95,11 +96,6 @@ if segment['syn'] == 1 and segment['ack'] == 1:
         else:
             if oldestUnack is None:
                 oldestUnack = segmentsToSendIndex
-            elif segmentsToSendIndex < oldestUnack:  
-                time.sleep(timer/1000)
-                segmentsToSend = oldestUnack
-                oldestUnack = None
-                continue
 
         # If we reached the maximum window size, we wait for all ACKs
         if segmentsToSendIndex % (MWS) == 0:
