@@ -72,7 +72,10 @@ if segment['syn'] == 1 and segment['ack'] == 1:
     print()
     print("Initial acknowledgement number: " + str(acknowledgementNumber))
 
-    
+    # Determines whether a packet is lost
+    packetLoss = False
+    # Sequence number of loss packet
+    packetLossSequence = None
     # Starting index of window
     windowStart = 0
     # Number of packets sent or dropped
@@ -90,43 +93,73 @@ if segment['syn'] == 1 and segment['ack'] == 1:
         )
 
         # PL modules
-        # if (random.random() > pdrop): 
-        senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
-        sequenceNumber += len(segmentPayload)
-        print("Sent segment: " + str(segmentsToSendIndex))
-        segmentsToSendIndex += 1
+        if (random.random() > pdrop): 
+            senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
+            print("Sent segment")
+            
 
+            if packetLoss == False:
+                windowStart += 1
+        else:
+            print("Dropped!")
+            if packetLoss == False:
+                windowStart = segmentsToSendIndex
+                packetLossSequence = sequenceNumber
+                packetLoss = True
+
+        print(PTPsegement)
+        print()
+        sequenceNumber += len(segmentPayload)
         windowSize += 1
+        segmentsToSendIndex += 1
 
         # If we reached the maximum window size, we wait for all ACKs
         if windowSize == MWS:
             receivedAcks = 0
             while receivedAcks < MWS:
-                message, senderAddress = senderSocket.recvfrom(2048)
+                # Checks if any packets are lost
+                try:
+                    message, senderAddress = senderSocket.recvfrom(2048)
 
-                ackSegment = json.loads(message.decode('utf-8'))
-                print("Received segemnet")
-                print(ackSegment)
-                print()
+                    ackSegment = json.loads(message.decode('utf-8'))
+                    print("Received segemnet")
+                    print(ackSegment)
+                    print()
 
-                if ackSegment['ack'] == 1:
-                    receivedAcks += 1;
-
-                windowSize = 0
+                    if ackSegment['ack'] == 1:
+                        receivedAcks += 1
+                # If packet is lost, revert back to the first unAcked segment
+                except:
+                    packetLoss = False
+                    sequenceNumber = packetLossSequence
+                    segmentsToSendIndex = windowStart
+                    break
+                windowSize = 0 
         elif segmentsToSendIndex == len(segmentsToSend):
             receivedAcks = 0
             while receivedAcks < segmentsToSendIndex % MWS:
-                message, senderAddress = senderSocket.recvfrom(2048)
+                try:
+                    message, senderAddress = senderSocket.recvfrom(2048)
 
-                ackSegment = json.loads(message.decode('utf-8'))
-                print("Received segemnet")
-                print(ackSegment)
-                print()
+                    ackSegment = json.loads(message.decode('utf-8'))
+                    print("Received segemnet")
+                    print(ackSegment)
+                    print()
 
-                if ackSegment['ack'] == 1:
-                    receivedAcks += 1;
+                    if ackSegment['ack'] == 1:
+                        receivedAcks += 1
+                # If packet is lost, revert back to the first unAcked segment
+                except:
+                    packetLoss = False
+                    sequenceNumber = packetLossSequence
+                    segmentsToSendIndex = windowStart
+                    break
+                windowSize = 0 
+
+        #         if ackSegment['ack'] == 1:
+        #             receivedAcks += 1;
                 
-                windowSize = 0
+        #         windowSize = 0
 
 # Closing connection
 
