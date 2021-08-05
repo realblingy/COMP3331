@@ -6,17 +6,33 @@ import time
 
 class SenderManager():
 
-    def __init__(self):
+    def __init__(self, fileToSend, MSS, MWS):
         self.lock = threading.Lock()
         self.sequenceNumber = 1000
         self.acknowledgementNumber = 0
-        # self.segmentsToSend = []
-        # self.segmentsToSendIndex = 0
+
         self.sock = None
         self.clientAddress = None
+
         self.senderLogActions = ""
         self.senderLogFile = open("Sender_log.txt", "w")
 
+        self.segmentsToSend = []
+        self.segmentsToSendIndex = 0
+
+        self.packetLoss = False
+        self.packetLossSequence = False
+        self.windowStart = 0
+
+        with open(fileToSend, "r") as f:
+            payload = f.read(MSS)
+            while payload != "":
+                # sManager.addSegmentToSend(payload)
+                self.segmentsToSend.append(payload)
+                payload = f.read(MSS)
+            f.close() 
+
+        self.windowEnd = min(MWS, len(self.segmentsToSend))
     # def increment(self):
     #     self.lock.acquire()
     #     try:
@@ -32,6 +48,9 @@ class SenderManager():
         self.sock = socket(AF_INET, SOCK_DGRAM)
         self.sock.bind((serverIP, serverPort))
         self.sock.settimeout(timer / 1000)
+
+    def getCurrentSegment(self):
+        return self.segmentsToSend[self.segmentsToSendIndex]
 
     # def addSegmentToSend(self, segment):
     #     self.segmentsToSend.append(segment)

@@ -1,5 +1,6 @@
 import sys
 from socket import *
+import threading
 from ptp import createSegement, senderLogFileEntry
 # import json
 import random
@@ -32,21 +33,21 @@ clientAddress = (receiverIP, receiverPort)
 
 # sequenceNumber = 1000
 # acknowledgementNumber = 0
-segmentsToSend = []
-segmentsToSendIndex = 0
+# segmentsToSend = []
+# segmentsToSendIndex = 0
 
-sManager = SenderManager()
+sManager = SenderManager(fileToSend, MSS, MWS)
 
 random.seed(seedNumber)
 
 # Creates segments to be sent
-with open(fileToSend, "r") as f:
-    payload = f.read(MSS)
-    while payload != "":
-        # sManager.addSegmentToSend(payload)
-        segmentsToSend.append(payload)
-        payload = f.read(MSS)
-    f.close()
+# with open(fileToSend, "r") as f:
+#     payload = f.read(MSS)
+#     while payload != "":
+#         # sManager.addSegmentToSend(payload)
+#         segmentsToSend.append(payload)
+#         payload = f.read(MSS)
+#     f.close()
 
 
 # senderSocket = socket(AF_INET, SOCK_DGRAM)
@@ -129,13 +130,13 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
     # print("Initial acknowledgement number: " + str(acknowledgementNumber))
 
     # Determines whether a packet is lost
-    packetLoss = False
-    # Sequence number of loss packet
-    packetLossSequence = None
-    # Start pointer of window
-    windowStart = 0
-    # End pointer of window
-    windowEnd = min(MWS, len(segmentsToSend))
+    # packetLoss = False
+    # # Sequence number of loss packet
+    # packetLossSequence = None
+    # # Start pointer of window
+    # windowStart = 0
+    # # End pointer of window
+    # windowEnd = min(MWS, len(segmentsToSend))
 
 
     # FOR LOG FILE
@@ -145,9 +146,13 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
     retransmittedSegments = 0
     dupAcksReceived = 0
 
+    sendingThread = threading.Thread()
+    receivingThread = threading.Thread()
+
+
     # Sends PTP segments with data
-    while segmentsToSendIndex < len(segmentsToSend):
-        segmentPayload = segmentsToSend[segmentsToSendIndex]
+    while sManager.segmentsToSendIndex < len(sManager.segmentsToSend):
+        segmentPayload = sManager.getCurrentSegment()
         PTPsegement = createSegement(
             sManager.sequenceNumber,
             sManager.acknowledgementNumber,
@@ -160,10 +165,10 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
         # If we do not drop the packet, we move the window
         if (random.random() > pdrop): 
             sManager.sendSegment(PTPsegement, (receiverIP, receiverPort))
-            if packetLoss == False:
-                windowStart += 1
+            if sManager.packetLoss == False:
+                sManager.windowStart += 1
                 packetLossSequence = sManager.sequenceNumber
-                windowEnd = min(windowEnd + 1, len(segmentsToSend))
+                sManager.windowEnd = min(sManager.windowEnd + 1, len(sManager.segmentsToSend))
                 sManager.addLogAction(
                     senderLogFileEntry(
                         "snd",
@@ -175,9 +180,9 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
                     )
                 )
         else:
-            if packetLoss == False:
+            if sManager.packetLoss == False:
                 packetLossSequence = sManager.sequenceNumber
-                packetLoss = True
+                sManager.packetLoss = True
                 sManager.addLogAction(
                     senderLogFileEntry(
                         "drop",
@@ -206,10 +211,10 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
                     ackSegment['acknowledgementNumber']
                 )
             )
-            segmentsToSendIndex += 1
+            sManager.segmentsToSendIndex += 1
         except:
-            segmentsToSendIndex = windowStart
-            packetLoss = False
+            sManager.segmentsToSendIndex = sManager.windowStart
+            sManager.packetLoss = False
             sManager.sequenceNumber = packetLossSequence
 
 finSegment = createSegement(
