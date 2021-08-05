@@ -32,6 +32,8 @@ receiverLogFile = open("Receiver_log.txt", "w")
 
 startTime = time.time()
 
+totalDataReceived = 0
+totalDataSegmentsReceived = 0
 
 # Sends SYN-ACK segment
 if segment['syn'] == 1:
@@ -123,6 +125,11 @@ while 1:
             acknowledgementNumber
         )
 
+        receiveLogActions += "\n=====================================================\n"
+        receiveLogActions += f"Amount of data received: {totalDataReceived}\n"
+        receiveLogActions += f"Number of data segments received: {totalDataSegmentsReceived}\n"
+
+
         fileReceived.write(contents)
 
         # print("Closing socket");
@@ -145,6 +152,8 @@ while 1:
     if segment['sequenceNumber'] == acknowledgementNumber:
         acknowledgementNumber += int(segment['length'])
         contents += segment['payload']
+        totalDataSegmentsReceived += 1
+        totalDataReceived += int(segment['length'])
         # print("Received segment")
         # print(segment)
         # print()

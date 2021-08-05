@@ -43,12 +43,20 @@ class SenderManager():
         self.sentSegments = 0
         self.sentNonDroppedSegments = 0
 
+        # For the log file
+        self.totalDataTransferred = 0
+        self.totalDataSegmentsSent = 0
+        self.totalPacketsDropped = 0
+        self.totalDuplicateAcks = 0
+
         with open(fileToSend, "r") as f:
             payload = f.read(MSS)
             while payload != "":
+                self.totalDataSegmentsSent += 1
                 # sManager.addSegmentToSend(payload)
                 self.segmentsToSend.append(payload)
                 payload = f.read(MSS)
+                self.totalDataTransferred += len(payload)
             f.close() 
 
         self.windowEnd = min(MWS, len(self.segmentsToSend))
@@ -124,6 +132,7 @@ class SenderManager():
                         self.packetLossSequence = self.sequenceNumber
                 else:
                     # print("Dropped segment")
+                    self.totalPacketsDropped += 1
                     self.addLogAction(
                         senderLogFileEntry(
                             "drop",
@@ -173,9 +182,9 @@ class SenderManager():
                 self.sentNonDroppedSegments -= 1
                 # Checks if acknowledgement is the same
                 if int(ackSegment['acknowledgementNumber']) > lastAck:
-                    
                     self.lastReceivedAck = int(ackSegment['acknowledgementNumber'])
                 else:
+                    self.totalDuplicateAcks += 1
                     self.receivedDupAcks += 1
 
                 # Discard remaining ack segments and revert back to lost packet
@@ -186,6 +195,7 @@ class SenderManager():
                         self.sock.settimeout(None)
                         self.receiveSegment('A')
                         self.sentNonDroppedSegments -= 1
+                        self.totalDuplicateAcks += 1
                         # print("Successfully dropped non dropped segment, ", self.sentNonDroppedSegments)
                     raise Exception
                 # print("REMAINING NON-DROPPED, ", self.sentNonDroppedSegments)
@@ -231,6 +241,12 @@ class SenderManager():
 
     def closeSocket(self):
         self.senderLogFile.write(self.senderLogActions)
+        self.senderLogFile.write("\n=====================================================\n")
+        self.senderLogFile.write(f"Total data transferred: {self.totalDataTransferred}\n")
+        self.senderLogFile.write(f"Number of data segments sent: {self.totalDataSegmentsSent}\n")
+        self.senderLogFile.write(f"Number of (all) Packets Dropped (by the PL module): {self.totalPacketsDropped}\n")
+        self.senderLogFile.write(f"Number of duplicate acknowledgements received: {self.totalDuplicateAcks}\n")
+
         self.senderLogFile.close()
         self.sock.close()
 
