@@ -93,23 +93,23 @@ class SenderManager():
                 )
 
                 if (random.random() > self.pdrop):
-                    print("Sent segment")
+                    # print("Sent segment")
                     self.sendSegment(PTPsegement, clientAddress)
                     self.sentNonDroppedSegments += 1
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                 else:
-                    print("Dropped segment")
+                    # print("Dropped segment")
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                         self.packetLoss = True
                         self.packetLossIndex = self.segmentsToSendIndex
-                print("Sequence Number: ", self.sequenceNumber)
-                print()
+                # print("Sequence Number: ", self.sequenceNumber)
+                # print()
             finally:
                 
-                print(segmentPayload)
-                print()
+                # print(segmentPayload)
+                # print()
                 self.segmentsToSendIndex += 1
                 self.sentSegments += 1
                 self.incrementSequenceNumber(len(segmentPayload))
@@ -123,9 +123,9 @@ class SenderManager():
             if self.receivedAcks < self.sentSegments:
                 lastAck = self.lastReceivedAck
                 ackSegment = self.receiveSegment()
-                print("Last received ACK: ", self.lastReceivedAck)
-                print("Received ACK: ", ackSegment['acknowledgementNumber'])
-                print()
+                # print("Last received ACK: ", self.lastReceivedAck)
+                # print("Received ACK: ", ackSegment['acknowledgementNumber'])
+                # print()
                 self.sentNonDroppedSegments -= 1
                 # Checks if acknowledgement is the same
                 if int(ackSegment['acknowledgementNumber']) > lastAck:
@@ -136,32 +136,22 @@ class SenderManager():
 
                 # Discard remaining ack segments and revert back to lost packet
                 if self.receivedDupAcks == 3:
-                    print("RECEIVED DUP ACKS")
+                    # print("RECEIVED DUP ACKS")
 
                     while (self.sentNonDroppedSegments > 0):
                         self.sock.settimeout(None)
                         self.receiveSegment()
                         self.sentNonDroppedSegments -= 1
-                        print("Successfully dropped non dropped segment, ", self.sentNonDroppedSegments)
+                        # print("Successfully dropped non dropped segment, ", self.sentNonDroppedSegments)
                     raise Exception
-                print("REMAINING NON-DROPPED, ", self.sentNonDroppedSegments)
-                print("PACKET LOSS INDEX ", self.packetLossIndex)
-                print()
+                # print("REMAINING NON-DROPPED, ", self.sentNonDroppedSegments)
+                # print("PACKET LOSS INDEX ", self.packetLossIndex)
+                # print()
 
                 self.receivedAcks += 1
                 self.windowStart += 1
                 self.windowEnd = min(self.windowEnd + 1, len(self.segmentsToSend))
-                # sManager.addLogAction(
-                #     senderLogFileEntry(
-                #         "rcv",
-                #         round(time.time() - startTime, 6),
-                #         "A",
-                #         ackSegment['sequenceNumber'],
-                #         0,
-                #         ackSegment['acknowledgementNumber']
-                #     )
-                # )
-        # If we timeout, revert back to the start of window
+
         except:
             self.sock.settimeout(self.timer / 1000)
             self.sentNonDroppedSegments = 0
