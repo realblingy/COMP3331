@@ -1,6 +1,6 @@
 import json
 import random
-from ptp import createSegement
+from ptp import createSegement, senderLogFileEntry
 from socket import AF_INET, SOCK_DGRAM, socket
 import threading
 import time
@@ -16,6 +16,8 @@ class SenderManager():
         self.sequenceNumber = 1000
         self.acknowledgementNumber = 0
         self.pdrop = pdrop
+
+        self.timeElapsed = time.time()
 
         self.sock = None
         self.clientAddress = None
@@ -96,10 +98,32 @@ class SenderManager():
                     # print("Sent segment")
                     self.sendSegment(PTPsegement, clientAddress)
                     self.sentNonDroppedSegments += 1
+
+                    self.addLogAction(
+                        senderLogFileEntry(
+                            "snd",
+                            0,
+                            "D",
+                            self.sequenceNumber,
+                            len(segmentPayload),
+                            self.acknowledgementNumber,
+                        )
+                    )
+
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                 else:
                     # print("Dropped segment")
+                    self.addLogAction(
+                        senderLogFileEntry(
+                            "drop",
+                            0,
+                            "D",
+                            self.sequenceNumber,
+                            len(segmentPayload),
+                            self.acknowledgementNumber,
+                        )
+                    )
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                         self.packetLoss = True
@@ -123,6 +147,16 @@ class SenderManager():
             if self.receivedAcks < self.sentSegments:
                 lastAck = self.lastReceivedAck
                 ackSegment = self.receiveSegment()
+                self.addLogAction(
+                    senderLogFileEntry(
+                        "rcv",
+                        0,
+                        "D",
+                        self.sequenceNumber,
+                        0,
+                        self.acknowledgementNumber,
+                    )
+                )
                 # print("Last received ACK: ", self.lastReceivedAck)
                 # print("Received ACK: ", ackSegment['acknowledgementNumber'])
                 # print()
