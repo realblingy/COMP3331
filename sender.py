@@ -1,7 +1,7 @@
 import sys
 from socket import *
 from ptp import createSegement, senderLogFileEntry
-import json
+# import json
 import random
 import time
 from threadingManagers import SenderManager
@@ -23,12 +23,15 @@ timer = int(sys.argv[6])
 pdrop = float(sys.argv[7])
 seedNumber = int(sys.argv[8])
 
-# Opens the log file
-senderLogFile = open("Sender_log.txt", "w")
-senderLogActions = ""
 
-sequenceNumber = 1000
-acknowledgementNumber = 0
+clientAddress = (receiverIP, receiverPort)
+
+# Opens the log file
+# senderLogFile = open("Sender_log.txt", "w")
+# senderLogActions = ""
+
+# sequenceNumber = 1000
+# acknowledgementNumber = 0
 segmentsToSend = []
 segmentsToSendIndex = 0
 
@@ -40,47 +43,86 @@ random.seed(seedNumber)
 with open(fileToSend, "r") as f:
     payload = f.read(MSS)
     while payload != "":
+        # sManager.addSegmentToSend(payload)
         segmentsToSend.append(payload)
         payload = f.read(MSS)
     f.close()
 
 
+# senderSocket = socket(AF_INET, SOCK_DGRAM)
+# senderSocket.bind((serverIP, serverPort))
+# senderSocket.settimeout(timer / 1000)
 
-senderSocket = socket(AF_INET, SOCK_DGRAM)
-senderSocket.bind((serverIP, serverPort))
-senderSocket.settimeout(timer / 1000)
+sManager.initializeSocket(serverIP, serverPort, timer)
 
 # Sends SYN segment
 synSegment = createSegement(
-    sequenceNumber,
+    sManager.sequenceNumber,
     syn=1
 )
 
-senderSocket.sendto(synSegment, (receiverIP, receiverPort))
+# senderSocket.sendto(synSegment, (receiverIP, receiverPort))
+sManager.sendSegment(synSegment, clientAddress)
 
-senderLogActions += senderLogFileEntry("snd", round(time.time() - startTime, 6), "S", sequenceNumber, 0, acknowledgementNumber)
+sManager.addLogAction(
+    senderLogFileEntry(
+        "snd",
+        round(time.time() - startTime, 6),
+        "S",
+        sManager.sequenceNumber,
+        0,
+        sManager.acknowledgementNumber
+    )
+)
 
 # Receives SYN-ACK segement
-message, senderAddress = senderSocket.recvfrom(2048)
-segment = json.loads(message.decode('utf-8'))
+# message, senderAddress = senderSocket.recvfrom(2048)
+# segment = json.loads(message.decode('utf-8'))
+SynAcksegment = sManager.receiveSegment()
 
 # Sends ACK segment
-if segment['syn'] == 1 and segment['ack'] == 1:
+if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
 
-    sequenceNumber += 1
-    acknowledgementNumber = int(segment['sequenceNumber']) + 1
+    # sequenceNumber += 1
+    sManager.incrementSequenceNumber(1)
+    sManager.setAcknowledgementNumber(
+        int(SynAcksegment['sequenceNumber']) + 1
+    )
+    # acknowledgementNumber = int(SynAcksegment['sequenceNumber']) + 1
 
-    senderLogActions += senderLogFileEntry("rcv", round(time.time() - startTime, 6), "SA", segment['sequenceNumber'], 0, segment['acknowledgementNumber'])
+    sManager.addLogAction(
+        senderLogFileEntry(
+            "rcv",
+            round(time.time() - startTime, 6),
+            "SA",
+            SynAcksegment['sequenceNumber'],
+            0,
+            SynAcksegment['acknowledgementNumber']
+        )
+    )
 
     ackSegment = createSegement(
-        sequenceNumber,
-        acknowledgementNumber,
+        sManager.sequenceNumber,
+        sManager.acknowledgementNumber,
         ack = 1
     )
 
-    senderSocket.sendto(ackSegment, (receiverIP, receiverPort))
+    sManager.sendSegment(
+        ackSegment,
+        clientAddress
+    )
+    # senderSocket.sendto(ackSegment, (receiverIP, receiverPort))
 
-    senderLogActions += senderLogFileEntry("snd", round(time.time() - startTime, 6), "A", sequenceNumber, 0, acknowledgementNumber)
+    sManager.addLogAction(
+        senderLogFileEntry(
+            "snd",
+            round(time.time() - startTime, 6),
+            "A",
+            sManager.sequenceNumber,
+            0,
+            sManager.acknowledgementNumber
+        )
+    )
 
     # print("Initial sequence number: " + str(sequenceNumber))
     # print()
@@ -107,8 +149,8 @@ if segment['syn'] == 1 and segment['ack'] == 1:
     while segmentsToSendIndex < len(segmentsToSend):
         segmentPayload = segmentsToSend[segmentsToSendIndex]
         PTPsegement = createSegement(
-            sequenceNumber,
-            acknowledgementNumber,
+            sManager.sequenceNumber,
+            sManager.acknowledgementNumber,
             payload=segmentPayload,
             length=len(segmentPayload)
         )
@@ -117,61 +159,114 @@ if segment['syn'] == 1 and segment['ack'] == 1:
 
         # If we do not drop the packet, we move the window
         if (random.random() > pdrop): 
-            senderSocket.sendto(PTPsegement, (receiverIP, receiverPort))
+            sManager.sendSegment(PTPsegement, (receiverIP, receiverPort))
             if packetLoss == False:
                 windowStart += 1
-                packetLossSequence = sequenceNumber
+                packetLossSequence = sManager.sequenceNumber
                 windowEnd = min(windowEnd + 1, len(segmentsToSend))
-                senderLogActions += senderLogFileEntry("snd", round(time.time() - startTime, 6), "D", sequenceNumber, len(segmentPayload), acknowledgementNumber)
+                sManager.addLogAction(
+                    senderLogFileEntry(
+                        "snd",
+                        round(time.time() - startTime, 6),
+                        "D",
+                        sManager.sequenceNumber,
+                        len(segmentPayload),
+                        sManager.acknowledgementNumber
+                    )
+                )
         else:
             if packetLoss == False:
-                packetLossSequence = sequenceNumber
+                packetLossSequence = sManager.sequenceNumber
                 packetLoss = True
-                senderLogActions += senderLogFileEntry("drop", round(time.time() - startTime, 6), "D", sequenceNumber, len(segmentPayload), acknowledgementNumber)
+                sManager.addLogAction(
+                    senderLogFileEntry(
+                        "drop",
+                        round(time.time() - startTime, 6),
+                        "D",
+                        sManager.sequenceNumber,
+                        len(segmentPayload),
+                        sManager.acknowledgementNumber
+                    )
+                )
 
-        sequenceNumber += len(segmentPayload)
+        sManager.incrementSequenceNumber(len(segmentPayload))
         # print(PTPsegement)
         # print()
 
         try:
-            message, senderAddress = senderSocket.recvfrom(2048)
-            ackSegment = json.loads(message.decode('utf-8'))
-            senderLogActions += senderLogFileEntry("rcv", round(time.time() - startTime, 6), "A", ackSegment['sequenceNumber'], 0, ackSegment['acknowledgementNumber'])
+            # message, senderAddress = senderSocket.recvfrom(2048)
+            ackSegment = sManager.receiveSegment()
+            sManager.addLogAction(
+                senderLogFileEntry(
+                    "rcv",
+                    round(time.time() - startTime, 6),
+                    "A",
+                    ackSegment['sequenceNumber'],
+                    0,
+                    ackSegment['acknowledgementNumber']
+                )
+            )
             segmentsToSendIndex += 1
         except:
             segmentsToSendIndex = windowStart
             packetLoss = False
-            sequenceNumber = packetLossSequence
+            sManager.sequenceNumber = packetLossSequence
 
 finSegment = createSegement(
-    sequenceNumber,
-    acknowledgementNumber,
+    sManager.sequenceNumber,
+    sManager.acknowledgementNumber,
     fin=1
 )
 
 # Sends fin segment
-senderSocket.sendto(finSegment, (receiverIP, receiverPort))
-senderLogActions += senderLogFileEntry("snd", round(time.time() - startTime, 6), "F", sequenceNumber, 0, acknowledgementNumber)
+sManager.sendSegment(finSegment, (receiverIP, receiverPort))
+sManager.addLogAction(
+    senderLogFileEntry(
+        "snd",
+        round(time.time() - startTime, 6),
+        "F",
+        sManager.sequenceNumber,
+        0,
+        sManager.acknowledgementNumber
+    )
+)
 
-message, senderAddress = senderSocket.recvfrom(2048)
-segment = json.loads(message.decode('utf-8'))
+segment = sManager.receiveSegment()
 
 ackSegment = createSegement(
-    sequenceNumber,
-    acknowledgementNumber,
+    sManager.sequenceNumber,
+    sManager.acknowledgementNumber,
     ack = 1
 )
 
 # Checks if fin-ack segment was received
 if segment["fin"] == 1 and segment["ack"] == 1:
 
-    senderLogActions += senderLogFileEntry("rcv", round(time.time() - startTime, 6), "FA", segment['sequenceNumber'], 0, segment['acknowledgementNumber'])
-    senderSocket.sendto(ackSegment, (receiverIP, receiverPort))
-    senderLogActions += senderLogFileEntry("snd", round(time.time() - startTime, 6), "A", sequenceNumber, 0, acknowledgementNumber)
+    sManager.addLogAction(
+        senderLogFileEntry(
+            "rcv",
+            round(time.time() - startTime, 6),
+            "FA",
+            segment['sequenceNumber'],
+            0,
+            segment['acknowledgementNumber']
+        )
+    )
+    sManager.sendSegment(ackSegment, (receiverIP, receiverPort))
+    sManager.addLogAction(
+        senderLogFileEntry(
+            "snd",
+            round(time.time() - startTime, 6),
+            "A",
+            sManager.sequenceNumber,
+            0,
+            sManager.acknowledgementNumber
+        )
+    )
 
-senderLogFile.write(senderLogActions)
+# senderLogFile.write(senderLogActions)
 
-senderLogFile.close()
+# senderLogFile.close()
 
 # print("Closing socket")  
-senderSocket.close()
+sManager.closeSocket()

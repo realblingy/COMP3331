@@ -1,3 +1,5 @@
+import json
+from socket import AF_INET, SOCK_DGRAM, socket
 import threading
 import time
 
@@ -8,29 +10,70 @@ class SenderManager():
         self.lock = threading.Lock()
         self.sequenceNumber = 1000
         self.acknowledgementNumber = 0
-        self.segmentsToSend = 0
-        self.segmentsToSendIndex = 0
+        # self.segmentsToSend = []
+        # self.segmentsToSendIndex = 0
+        self.sock = None
+        self.clientAddress = None
+        self.senderLogActions = ""
+        self.senderLogFile = open("Sender_log.txt", "w")
 
-    def increment(self):
-        self.lock.acquire()
+    # def increment(self):
+    #     self.lock.acquire()
+    #     try:
+    #         print("Acquired a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
+    #         self.segmentsToSendIndex += 3
+    #     finally:
+    #         print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
+    #         self.lock.release()
+    def addLogAction(self, entry):
+        self.senderLogActions += entry
+
+    def initializeSocket(self, serverIP, serverPort, timer):
+        self.sock = socket(AF_INET, SOCK_DGRAM)
+        self.sock.bind((serverIP, serverPort))
+        self.sock.settimeout(timer / 1000)
+
+    # def addSegmentToSend(self, segment):
+    #     self.segmentsToSend.append(segment)
+    
+    def incrementSequenceNumber(self, increment):
+        self.sequenceNumber += increment
+
+    def setSequenceNumber(self, newSequenceNumber):
+        self.sequenceNumber = newSequenceNumber
+
+    def incrementAcknowledgementNumber(self, increment):
+        self.acknowledgementNumber += increment
+
+    def setAcknowledgementNumber(self, newAcknowledgementNumber):
+        self.acknowledgementNumber = newAcknowledgementNumber
+
+    # def decrement(self):
+    #     print("Decrementing")
+    #     print("Waiting for lock")
+    #     self.lock.acquire()
+    #     try:
+    #         print("Acquired a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
+    #         self.segmentsToSendIndex -= 1
+    #     finally:
+    #         print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
+    #         self.lock.release()
+
+    def sendSegment(self, segment, clientAddress):
+        self.sock.sendto(segment, clientAddress)
+
+    def receiveSegment(self):
         try:
-            print("Acquired a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-            self.segmentsToSendIndex += 3
-        finally:
-            print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-            self.lock.release()
+            message, clientAddress = self.sock.recvfrom(2048)
+            segment = json.loads(message.decode('utf-8'))
+            return segment
+        except:
+            raise Exception()
 
-    def decrement(self):
-        print("Decrementing")
-        print("Waiting for lock")
-        self.lock.acquire()
-        try:
-            print("Acquired a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-            self.segmentsToSendIndex -= 1
-        finally:
-            print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-            self.lock.release()
-
+    def closeSocket(self):
+        self.senderLogFile.write(self.senderLogActions)
+        self.senderLogFile.close()
+        self.sock.close()
 
 def sendSegment(s):
 

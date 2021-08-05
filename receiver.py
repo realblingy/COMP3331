@@ -61,7 +61,9 @@ if segment['ack'] == 1:
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
     segment = json.loads(message.decode('utf-8'))
-
+    # print("Received segment")
+    # print(segment)
+    # print("==================")
 
     # Sender sends finish segment which closes the socket
     if segment['fin'] == 1:
@@ -89,9 +91,9 @@ while 1:
     if segment['sequenceNumber'] == acknowledgementNumber:
         acknowledgementNumber += int(segment['length'])
         contents += segment['payload']
-        # print("Received segment")
-        # print(segment)
-        # print()
+        print("Received segment")
+        print(segment)
+        print()
     
     ackSegment = createSegement(
         sequenceNumber,
