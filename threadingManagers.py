@@ -1,4 +1,5 @@
 import json
+from ptp import createSegement
 from socket import AF_INET, SOCK_DGRAM, socket
 import threading
 import time
@@ -23,6 +24,10 @@ class SenderManager():
         self.packetLoss = False
         self.packetLossSequence = False
         self.windowStart = 0
+        self.lastReceivedAck = 0
+
+        self.receivedAcks = 0
+        self.sentSegments = 0
 
         with open(fileToSend, "r") as f:
             payload = f.read(MSS)
@@ -78,13 +83,75 @@ class SenderManager():
     #         print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
     #         self.lock.release()
 
+
     def sendSegment(self, segment, clientAddress):
+
         self.sock.sendto(segment, clientAddress)
+
+
+    def sendPLSegment(self, clientAddress):
+        print("============================")
+        print("Acquired lock for sending!")
+        self.lock.acquire()
+        # Checks if we sent all segments in window
+        while self.segmentsToSendIndex < self.windowEnd:
+            segmentPayload = self.getCurrentSegment()
+            try:
+                PTPsegement = createSegement(
+                    self.sequenceNumber,
+                    self.acknowledgementNumber,
+                    payload=segmentPayload,
+                    length=len(segmentPayload)
+                )
+                self.sendSegment(PTPsegement, clientAddress)
+                if self.packetLoss == False:
+                    self.packetLossSequence = self.sequenceNumber
+                # self.incrementSequenceNumber(len(segmentPayload))
+            finally:
+                print("Sent segment")
+                print("Sequence Number: ", self.sequenceNumber)
+                print(segmentPayload)
+                print()
+                self.segmentsToSendIndex += 1
+                self.incrementSequenceNumber(len(segmentPayload))
+        print("Released lock for sending!")
+        print("============================")
+        self.lock.release()
+
+    def receivePLSegment(self):
+        print("============================")
+        print("Acquired lock for receiving!")
+        self.lock.acquire()
+        try:
+            # message, senderAddress = senderSocket.recvfrom(2048)
+            ackSegment = self.receiveSegment()
+            self.receivedAcks += 1
+            self.windowStart += 1
+            self.windowEnd = min(self.windowEnd + 1, len(self.segmentsToSend))
+            # sManager.addLogAction(
+            #     senderLogFileEntry(
+            #         "rcv",
+            #         round(time.time() - startTime, 6),
+            #         "A",
+            #         ackSegment['sequenceNumber'],
+            #         0,
+            #         ackSegment['acknowledgementNumber']
+            #     )
+            # )
+        except:
+            self.segmentsToSendIndex = self.windowStart
+            self.packetLoss = False
+            self.sequenceNumber = self.packetLossSequence
+        finally:
+            print("Released lock for receiving!")
+            print("============================")
+            self.lock.release()
 
     def receiveSegment(self):
         try:
             message, clientAddress = self.sock.recvfrom(2048)
             segment = json.loads(message.decode('utf-8'))
+            self.lastReceivedAck = int(segment['acknowledgementNumber'])
             return segment
         except:
             raise Exception()
