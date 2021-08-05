@@ -4,6 +4,7 @@ from ptp import createSegement, senderLogFileEntry
 import json
 import random
 import time
+from threadingManagers import SenderManager
 
 startTime = time.time()
 
@@ -30,6 +31,8 @@ sequenceNumber = 1000
 acknowledgementNumber = 0
 segmentsToSend = []
 segmentsToSendIndex = 0
+
+sManager = SenderManager()
 
 random.seed(seedNumber)
 
