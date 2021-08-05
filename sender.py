@@ -39,21 +39,21 @@ synSegment = createSegement(
     syn=1
 )
 
-sManager.sendSegment(synSegment, clientAddress)
+sManager.sendSegment(synSegment, clientAddress, 0, 'S')
 
-sManager.addLogAction(
-    senderLogFileEntry(
-        "snd",
-        round(time.time() - startTime, 6),
-        "S",
-        sManager.sequenceNumber,
-        0,
-        sManager.acknowledgementNumber
-    )
-)
+# sManager.addLogAction(
+#     senderLogFileEntry(
+#         "snd",
+#         round(time.time() - startTime, 6),
+#         "S",
+#         sManager.sequenceNumber,
+#         0,
+#         sManager.acknowledgementNumber
+#     )
+# )
 
 # Receives SYN-ACK segement
-SynAcksegment = sManager.receiveSegment()
+SynAcksegment = sManager.receiveSegment('SA')
 
 # Sends ACK segment
 if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
@@ -63,16 +63,16 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
         int(SynAcksegment['sequenceNumber']) + 1
     )
 
-    sManager.addLogAction(
-        senderLogFileEntry(
-            "rcv",
-            round(time.time() - startTime, 6),
-            "SA",
-            SynAcksegment['sequenceNumber'],
-            0,
-            SynAcksegment['acknowledgementNumber']
-        )
-    )
+    # sManager.addLogAction(
+    #     senderLogFileEntry(
+    #         "rcv",
+    #         round(time.time() - startTime, 6),
+    #         "SA",
+    #         SynAcksegment['sequenceNumber'],
+    #         0,
+    #         SynAcksegment['acknowledgementNumber']
+    #     )
+    # )
 
     ackSegment = createSegement(
         sManager.sequenceNumber,
@@ -82,19 +82,21 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
 
     sManager.sendSegment(
         ackSegment,
-        clientAddress
+        clientAddress,
+        0,
+        'A'
     )
 
-    sManager.addLogAction(
-        senderLogFileEntry(
-            "snd",
-            round(time.time() - startTime, 6),
-            "A",
-            sManager.sequenceNumber,
-            0,
-            sManager.acknowledgementNumber
-        )
-    )
+    # sManager.addLogAction(
+    #     senderLogFileEntry(
+    #         "snd",
+    #         round(time.time() - startTime, 6),
+    #         "A",
+    #         sManager.sequenceNumber,
+    #         0,
+    #         sManager.acknowledgementNumber
+    #     )
+    # )
 
     # FOR LOG FILE
     dataTransferredBits = 0
@@ -194,19 +196,19 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
     )
 
     # Sends fin segment
-    sManager.sendSegment(finSegment, (receiverIP, receiverPort))
-    sManager.addLogAction(
-        senderLogFileEntry(
-            "snd",
-            round(time.time() - startTime, 6),
-            "F",
-            sManager.sequenceNumber,
-            0,
-            sManager.acknowledgementNumber
-        )
-    )
+    sManager.sendSegment(finSegment, (receiverIP, receiverPort), 0, 'F')
+    # sManager.addLogAction(
+    #     senderLogFileEntry(
+    #         "snd",
+    #         round(time.time() - startTime, 6),
+    #         "F",
+    #         sManager.sequenceNumber,
+    #         0,
+    #         sManager.acknowledgementNumber
+    #     )
+    # )
 
-    segment = sManager.receiveSegment()
+    segment = sManager.receiveSegment('A')
 
     ackSegment = createSegement(
         sManager.sequenceNumber,
@@ -217,27 +219,27 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
     # Checks if fin-ack segment was received
     if segment["fin"] == 1 and segment["ack"] == 1:
 
-        sManager.addLogAction(
-            senderLogFileEntry(
-                "rcv",
-                round(time.time() - startTime, 6),
-                "FA",
-                segment['sequenceNumber'],
-                0,
-                segment['acknowledgementNumber']
-            )
-        )
-        sManager.sendSegment(ackSegment, (receiverIP, receiverPort))
-        sManager.addLogAction(
-            senderLogFileEntry(
-                "snd",
-                round(time.time() - startTime, 6),
-                "A",
-                sManager.sequenceNumber,
-                0,
-                sManager.acknowledgementNumber
-            )
-        )
+        # sManager.addLogAction(
+        #     senderLogFileEntry(
+        #         "rcv",
+        #         round(time.time() - startTime, 6),
+        #         "FA",
+        #         segment['sequenceNumber'],
+        #         0,
+        #         segment['acknowledgementNumber']
+        #     )
+        # )
+        sManager.sendSegment(ackSegment, (receiverIP, receiverPort), 0, 'A')
+        # sManager.addLogAction(
+        #     senderLogFileEntry(
+        #         "snd",
+        #         round(time.time() - startTime, 6),
+        #         "A",
+        #         sManager.sequenceNumber,
+        #         0,
+        #         sManager.acknowledgementNumber
+        #     )
+        # )
 
     # senderLogFile.write(senderLogActions)
 

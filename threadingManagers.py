@@ -77,9 +77,19 @@ class SenderManager():
     def setAcknowledgementNumber(self, newAcknowledgementNumber):
         self.acknowledgementNumber = newAcknowledgementNumber
 
-    def sendSegment(self, segment, clientAddress):
+    def sendSegment(self, segment, clientAddress, length, flag):
 
         self.sock.sendto(segment, clientAddress)
+        self.addLogAction(
+            senderLogFileEntry(
+                "snd",
+                round(time.time() - self.timeElapsed, 6),
+                flag,
+                self.sequenceNumber,
+                length,
+                self.acknowledgementNumber,
+            )
+        )
 
 
     def sendPLSegment(self, clientAddress):
@@ -96,19 +106,19 @@ class SenderManager():
 
                 if (random.random() > self.pdrop):
                     # print("Sent segment")
-                    self.sendSegment(PTPsegement, clientAddress)
+                    self.sendSegment(PTPsegement, clientAddress, len(segmentPayload), 'D')
                     self.sentNonDroppedSegments += 1
 
-                    self.addLogAction(
-                        senderLogFileEntry(
-                            "snd",
-                            0,
-                            "D",
-                            self.sequenceNumber,
-                            len(segmentPayload),
-                            self.acknowledgementNumber,
-                        )
-                    )
+                    # self.addLogAction(
+                    #     senderLogFileEntry(
+                    #         "snd",
+                    #         time.time() - self.timeElapsed,
+                    #         "D",
+                    #         self.sequenceNumber,
+                    #         len(segmentPayload),
+                    #         self.acknowledgementNumber,
+                    #     )
+                    # )
 
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
@@ -117,7 +127,7 @@ class SenderManager():
                     self.addLogAction(
                         senderLogFileEntry(
                             "drop",
-                            0,
+                            round(time.time() - self.timeElapsed, 6),
                             "D",
                             self.sequenceNumber,
                             len(segmentPayload),
@@ -146,17 +156,17 @@ class SenderManager():
             # Only receive segments if they are sent
             if self.receivedAcks < self.sentSegments:
                 lastAck = self.lastReceivedAck
-                ackSegment = self.receiveSegment()
-                self.addLogAction(
-                    senderLogFileEntry(
-                        "rcv",
-                        0,
-                        "D",
-                        self.sequenceNumber,
-                        0,
-                        self.acknowledgementNumber,
-                    )
-                )
+                ackSegment = self.receiveSegment('A')
+                # self.addLogAction(
+                #     senderLogFileEntry(
+                #         "rcv",
+                #         round(time.time() - self.timeElapsed, 6),
+                #         "D",
+                #         self.sequenceNumber,
+                #         0,
+                #         self.acknowledgementNumber,
+                #     )
+                # )
                 # print("Last received ACK: ", self.lastReceivedAck)
                 # print("Received ACK: ", ackSegment['acknowledgementNumber'])
                 # print()
@@ -174,7 +184,7 @@ class SenderManager():
 
                     while (self.sentNonDroppedSegments > 0):
                         self.sock.settimeout(None)
-                        self.receiveSegment()
+                        self.receiveSegment('A')
                         self.sentNonDroppedSegments -= 1
                         # print("Successfully dropped non dropped segment, ", self.sentNonDroppedSegments)
                     raise Exception
@@ -200,11 +210,21 @@ class SenderManager():
             # print("============================")
             self.lock.release()
 
-    def receiveSegment(self):
+    def receiveSegment(self, flag):
         try:
             message, clientAddress = self.sock.recvfrom(2048)
             segment = json.loads(message.decode('utf-8'))
             self.lastReceivedAck = int(segment['acknowledgementNumber'])
+            self.addLogAction(
+                senderLogFileEntry(
+                    "rcv",
+                    round(time.time() - self.timeElapsed, 6),
+                    flag,
+                    self.sequenceNumber,
+                    int(segment['length']),
+                    self.acknowledgementNumber,
+                )
+            )
             return segment
         except:
             raise Exception()

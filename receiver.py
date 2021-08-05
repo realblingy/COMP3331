@@ -4,8 +4,6 @@ from socket import *
 import json
 import time
 
-startTime = time.time()
-
 if len(sys.argv) != 3:
     print("Usage python receiver.py <receiver_port> <FileReceived.txt>")
     sys.exit();
@@ -31,6 +29,8 @@ contents = ''
 
 receiveLogActions = ""
 receiverLogFile = open("Receiver_log.txt", "w")
+
+startTime = time.time()
 
 
 # Sends SYN-ACK segment
@@ -145,9 +145,9 @@ while 1:
     if segment['sequenceNumber'] == acknowledgementNumber:
         acknowledgementNumber += int(segment['length'])
         contents += segment['payload']
-        print("Received segment")
-        print(segment)
-        print()
+        # print("Received segment")
+        # print(segment)
+        # print()
     
     ackSegment = createSegement(
         sequenceNumber,
@@ -155,9 +155,9 @@ while 1:
         ack=1
     )
 
-    print("Acked Segment sent")
-    print(ackSegment)
-    print()
+    # print("Acked Segment sent")
+    # print(ackSegment)
+    # print()
 
     clientSocket.sendto(ackSegment, senderAddress)
 
