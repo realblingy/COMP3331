@@ -101,9 +101,9 @@ while 1:
         ack=1
     )
 
-    # print("Acked Segment sent")
-    # print(ackSegment)
-    # print()
+    print("Acked Segment sent")
+    print(ackSegment)
+    print()
 
     clientSocket.sendto(ackSegment, senderAddress)
 

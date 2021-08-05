@@ -28,6 +28,7 @@ class SenderManager():
 
         self.packetLoss = False
         self.packetLossSequence = False
+        self.packetLossIndex = 0
         self.windowStart = 0
         self.lastReceivedAck = 0
 
@@ -123,6 +124,7 @@ class SenderManager():
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                         self.packetLoss = True
+                        self.packetLossIndex = self.segmentsToSendIndex
                 print("Sequence Number: ", self.sequenceNumber)
                 print()
                 # self.incrementSequenceNumber(len(segmentPayload))
@@ -145,8 +147,8 @@ class SenderManager():
         # print("Acquired lock for receiving!")
         self.lock.acquire()
         try:
+            # Only receive segments if they are sent
             if self.receivedAcks < self.sentSegments:
-            # message, senderAddress = senderSocket.recvfrom(2048)
                 lastAck = self.lastReceivedAck
                 ackSegment = self.receiveSegment()
                 print("Last received ACK: ", self.lastReceivedAck)
@@ -171,9 +173,11 @@ class SenderManager():
                 #         ackSegment['acknowledgementNumber']
                 #     )
                 # )
+        # If we timeout, revert back to the start of window
         except:
-            self.sentSegments = self.windowStart
-            self.segmentsToSendIndex = self.windowStart
+            self.sentSegments = self.packetLossIndex
+            self.receivedAcks = self.packetLossIndex
+            self.segmentsToSendIndex = self.packetLossIndex
             self.packetLoss = False
             self.sequenceNumber = self.packetLossSequence
         finally:
