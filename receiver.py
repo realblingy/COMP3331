@@ -10,33 +10,31 @@ if len(sys.argv) != 3:
 
 
 receiverPort = int(sys.argv[1])
+# File to be written to
 fileReceived = open(sys.argv[2], "w")
 
 clientSocket = socket(AF_INET, SOCK_DGRAM)
 clientSocket.bind(('localhost', receiverPort))
 
-# print('PTP server is ready to receive')
 
 sequenceNumber = 500
 acknowledgementNumber = None
-allowSending = False
+
+# Entire file that will be received
+contents = ''
 
 # Awaits SYN segment
 message, senderAddress = clientSocket.recvfrom(2048)
-
 segment = json.loads(message.decode('utf-8'))
-contents = ''
 
+# FOR LOG GILE
+totalDataReceived = 0
+totalDataSegmentsReceived = 0
+totalDuplicateSegmentsReceived = 0
 receiveLogActions = ""
 receiverLogFile = open("Receiver_log.txt", "w")
 
 startTime = time.time()
-
-totalDataReceived = 0
-totalDataSegmentsReceived = 0
-totalDuplicateSegmentsReceived = 0
-prevAck = 0
-prevAckCounter = 0
 
 # Sends SYN-ACK segment
 if segment['syn'] == 1:
@@ -62,7 +60,6 @@ if segment['syn'] == 1:
 
 # Awaits ACK segment
 message, senderAddress = clientSocket.recvfrom(2048)
-
 segment = json.loads(message.decode('utf-8'))
 
 receiveLogActions += senderLogFileEntry(
@@ -76,29 +73,15 @@ receiveLogActions += senderLogFileEntry(
 
 # Connection established
 if segment['ack'] == 1:
-    allowSending = True
     sequenceNumber += 1
-    prevAck = acknowledgementNumber
-    
-    # print("A connection has been established with " + str(senderAddress))
-    # print()
-    # print("Initial sequence number: " + str(sequenceNumber))
-    # print()
-    # print("Initial acknowledgement number: " + str(acknowledgementNumber))
 
 # Receive segments
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
-    # print(segment['sequenceNumber'])
     segment = json.loads(message.decode('utf-8'))
-
-    # print("Received segment")
-    # print(segment)
-    # print("==================")
 
     # Sender sends finish segment which closes the socket
     if segment['fin'] == 1:
-
 
         finAckSegment = createSegement(
             sequenceNumber,
@@ -119,8 +102,8 @@ while 1:
             acknowledgementNumber
         )
 
+        # Receives ACK segment
         message, senderAddress = clientSocket.recvfrom(2048)
-
         receiveLogActions += senderLogFileEntry(
             "rcv",
             round(time.time() - startTime, 6),
@@ -132,16 +115,15 @@ while 1:
 
         totalDataReceived = len(contents)
 
+        # Summary of data
         receiveLogActions += "\n=====================================================\n"
         receiveLogActions += f"Amount of data received: {totalDataReceived}\n"
         receiveLogActions += f"Number of data segments received: {totalDataSegmentsReceived}\n"
         receiveLogActions += f"Number of duplicate segments received: {totalDuplicateSegmentsReceived}"
 
         fileReceived.write(contents)
-        
-
-        # print("Closing socket");
         receiverLogFile.write(receiveLogActions)
+
         receiverLogFile.close()
         fileReceived.close()
         clientSocket.close()
@@ -163,19 +145,12 @@ while 1:
         totalDataSegmentsReceived += 1
     else:
         totalDuplicateSegmentsReceived += 1
-        # print("Received segment")
-        # print(segment)
-        # print()
     
     ackSegment = createSegement(
         sequenceNumber,
         acknowledgementNumber,
         ack=1
     )
-
-    # print("Acked Segment sent")
-    # print(ackSegment)
-    # print()
 
     clientSocket.sendto(ackSegment, senderAddress)
 

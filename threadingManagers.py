@@ -52,7 +52,6 @@ class SenderManager():
 
         self.allSegments = 0
 
-        # self.droppedPacketSequences = []
 
         with open(fileToSend, "r") as f:
             payload = f.read(MSS)
@@ -118,30 +117,17 @@ class SenderManager():
                     length=len(segmentPayload)
                 )
 
+                # Send packet
                 if (random.random() > self.pdrop):
-                    # print("Sent segment")
                     self.allSegments += 1
                     self.sendSegment(PTPsegement, clientAddress, len(segmentPayload), 'D')
                     self.sentNonDroppedSegments += 1
-                    # print("Sent segment")
-
-                    # self.addLogAction(
-                    #     senderLogFileEntry(
-                    #         "snd",
-                    #         time.time() - self.timeElapsed,
-                    #         "D",
-                    #         self.sequenceNumber,
-                    #         len(segmentPayload),
-                    #         self.acknowledgementNumber,
-                    #     )
-                    # )
 
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                     else:
                         self.totalDuplicateSegments += 1
                 else:
-                    # print("Dropped segment")
                     self.totalPacketsDropped += 1
                     self.addLogAction(
                         senderLogFileEntry(
@@ -153,19 +139,11 @@ class SenderManager():
                             self.acknowledgementNumber,
                         )
                     )
-                    # if self.sequenceNumber not in self.droppedPacketSequences:
-                    #     self.droppedPacketSequences.append(self.sequenceNumber)
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                         self.packetLoss = True
                         self.packetLossIndex = self.segmentsToSendIndex
-                # print("Sequence Number: ", self.sequenceNumber)
-                # print()
             finally:
-                
-                # print(segmentPayload)
-                # print()
-                # print('============')
                 self.segmentsToSendIndex += 1
                 self.sentSegments += 1
                 self.incrementSequenceNumber(len(segmentPayload))
@@ -175,29 +153,12 @@ class SenderManager():
     def receivePLSegment(self):
         self.lock.acquire()
         try:
-            # Only receive segments if they are sent
-            # print(selfself.sentSegments)
+            # Only receive segments if we attempt to send them
+            # which can be dropped
             if self.receivedAcks < self.sentSegments:
                 lastAck = self.lastReceivedAck
                 ackSegment = self.receiveSegment('A')
-                # self.addLogAction(
-                #     senderLogFileEntry(
-                #         "rcv",
-                #         round(time.time() - self.timeElapsed, 6),
-                #         "D",
-                #         self.sequenceNumber,
-                #         0,
-                #         self.acknowledgementNumber,
-                #     )
-                # )
-                # print("Last received ACK: ", self.lastReceivedAck)
-                # print("Received ACK: ", ackSegment['acknowledgementNumber'])
-                # print()
-                # print("HERE")
                 self.sentNonDroppedSegments -= 1
-                # Checks if acknowledgement is the same
-
-
 
                 if int(ackSegment['acknowledgementNumber']) > lastAck:
                     self.lastReceivedAck = int(ackSegment['acknowledgementNumber'])
@@ -211,19 +172,11 @@ class SenderManager():
 
                 # Discard remaining ack segments and revert back to lost packet
                 if self.receivedDupAcks == 3:
-                    # print("RECEIVED DUP ACKS")
-
                     while (self.sentNonDroppedSegments > 0):
-                        # self.sock.settimeout(None)
                         self.receiveSegment('A')
                         self.sentNonDroppedSegments -= 1
                         self.totalDuplicateAcks += 1
-                        # print("Successfully dropped non dropped segment, ", self.sentNonDroppedSegments)
                     raise Exception
-                # print("REMAINING NON-DROPPED, ", self.sentNonDroppedSegments)
-                # print("PACKET LOSS INDEX ", self.packetLossIndex)
-                # print()
-
 
         except:
             self.sentNonDroppedSegments = 0
@@ -234,8 +187,6 @@ class SenderManager():
             self.packetLoss = False
             self.sequenceNumber = self.packetLossSequence
         finally:
-            # print("Released lock for receiving!")
-            # print("============================")
             self.lock.release()
 
     def receiveSegment(self, flag):
@@ -266,28 +217,6 @@ class SenderManager():
         self.senderLogFile.write(f"Number of (all) Packets Dropped (by the PL module): {self.totalPacketsDropped}\n")
         self.senderLogFile.write(f"Number of retransmitted segments: {self.totalDuplicateSegments}\n")
         self.senderLogFile.write(f"Number of duplicate acknowledgements received: {self.totalDuplicateAcks}\n")
-        # self.senderLogFile.write("\n=====================================================\n")
-        # self.senderLogFile.write("Packets that have dropped\n")
-        # print(f"All segments: ", self.allSegments)
-        # self.droppedPacketSequences.sort()
-        # for seq in self.droppedPacketSequences:
-        #     print(f"{seq}")
 
         self.senderLogFile.close()
         self.sock.close()
-
-
-# if __name__ == '__main__':
-
-#     sManager = SenderManager()
-
-#     t1 = threading.Thread(target=sendSegment, args=(sManager,))
-#     t1.start()
-
-#     t2 = threading.Thread(target=cancelSegment, args=(sManager,))
-#     t2.start()
-
-#     t1.join()
-#     t2.join()
-
-#     print("Final IDX number: ", sManager.segmentsToSendIndex)
