@@ -84,7 +84,7 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
     # Sends fin segment
     sManager.sendSegment(finSegment, (receiverIP, receiverPort), 0, 'F')
 
-    segment = sManager.receiveSegment('A')
+    segment = sManager.receiveSegment('FA')
 
     ackSegment = createSegement(
         sManager.sequenceNumber,
@@ -94,7 +94,7 @@ if SynAcksegment['syn'] == 1 and SynAcksegment['ack'] == 1:
 
     # Checks if fin-ack segment was received
     if segment["fin"] == 1 and segment["ack"] == 1:
-
+        sManager.incrementAcknowledgementNumber(1)
         sManager.sendSegment(ackSegment, (receiverIP, receiverPort), 0, 'A')
 
     sManager.closeSocket()

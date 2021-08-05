@@ -13,7 +13,7 @@ class SenderManager():
         random.seed(seedNumber)
 
         self.lock = threading.Lock()
-        self.sequenceNumber = 1000
+        self.sequenceNumber = 0
         self.acknowledgementNumber = 0
         self.pdrop = pdrop
 
@@ -128,6 +128,7 @@ class SenderManager():
                     else:
                         self.totalDuplicateSegments += 1
                 else:
+
                     self.totalPacketsDropped += 1
                     self.addLogAction(
                         senderLogFileEntry(
@@ -200,9 +201,9 @@ class SenderManager():
                     "rcv",
                     round(time.time() - self.timeElapsed, 6),
                     flag,
-                    self.sequenceNumber,
+                    segment['sequenceNumber'],
                     int(segment['length']),
-                    self.acknowledgementNumber,
+                    segment['acknowledgementNumber'],
                 )
             )
             return segment
@@ -217,6 +218,7 @@ class SenderManager():
         self.senderLogFile.write(f"Number of (all) Packets Dropped (by the PL module): {self.totalPacketsDropped}\n")
         self.senderLogFile.write(f"Number of retransmitted segments: {self.totalDuplicateSegments}\n")
         self.senderLogFile.write(f"Number of duplicate acknowledgements received: {self.totalDuplicateAcks}\n")
+    
 
         self.senderLogFile.close()
         self.sock.close()

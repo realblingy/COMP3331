@@ -17,7 +17,7 @@ clientSocket = socket(AF_INET, SOCK_DGRAM)
 clientSocket.bind(('localhost', receiverPort))
 
 
-sequenceNumber = 500
+sequenceNumber = 50
 acknowledgementNumber = None
 
 # Entire file that will be received
@@ -66,9 +66,9 @@ receiveLogActions += senderLogFileEntry(
     "rcv",
     round(time.time() - startTime, 6),
     "A",
-    sequenceNumber,
+    segment['sequenceNumber'],
     0,
-    acknowledgementNumber
+    segment['acknowledgementNumber']
 )
 
 # Connection established
@@ -83,11 +83,22 @@ while 1:
     # Sender sends finish segment which closes the socket
     if segment['fin'] == 1:
 
+        acknowledgementNumber += 1
+
         finAckSegment = createSegement(
             sequenceNumber,
             acknowledgementNumber,
             fin=1,
             ack=1,
+        )
+
+        receiveLogActions += senderLogFileEntry(
+            "rcv",
+            round(time.time() - startTime, 6),
+            "F",
+            sequenceNumber,
+            0,
+            acknowledgementNumber
         )
 
         
@@ -108,9 +119,9 @@ while 1:
             "rcv",
             round(time.time() - startTime, 6),
             "A",
-            sequenceNumber,
+            segment['sequenceNumber'],
             0,
-            acknowledgementNumber
+            segment['acknowledgementNumber']
         )
 
         totalDataReceived = len(contents)
@@ -133,9 +144,9 @@ while 1:
         "rcv",
         round(time.time() - startTime, 6),
         "D",
-        sequenceNumber,
+        segment['sequenceNumber'],
         segment['length'],
-        acknowledgementNumber
+        segment['acknowledgementNumber']
     )
 
     # Checks if right packet is sent
@@ -153,6 +164,16 @@ while 1:
     )
 
     clientSocket.sendto(ackSegment, senderAddress)
+
+    receiveLogActions += senderLogFileEntry(
+        "snd",
+        round(time.time() - startTime, 6),
+        "A",
+        sequenceNumber,
+        0,
+        acknowledgementNumber
+    )
+
 
             
 
