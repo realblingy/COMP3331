@@ -89,7 +89,7 @@ if segment['ack'] == 1:
 # Receive segments
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
-    print(segment['sequenceNumber'])
+    # print(segment['sequenceNumber'])
     segment = json.loads(message.decode('utf-8'))
 
     # print("Received segment")
