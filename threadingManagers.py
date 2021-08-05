@@ -1,4 +1,5 @@
 import json
+import random
 from ptp import createSegement
 from socket import AF_INET, SOCK_DGRAM, socket
 import threading
@@ -7,10 +8,14 @@ import time
 
 class SenderManager():
 
-    def __init__(self, fileToSend, MSS, MWS):
+    def __init__(self, fileToSend, MSS, MWS, seedNumber, pdrop):
+
+        random.seed(seedNumber)
+
         self.lock = threading.Lock()
         self.sequenceNumber = 1000
         self.acknowledgementNumber = 0
+        self.pdrop = pdrop
 
         self.sock = None
         self.clientAddress = None
@@ -26,6 +31,10 @@ class SenderManager():
         self.windowStart = 0
         self.lastReceivedAck = 0
 
+        self.hasSentWindow = False
+
+        self.lastReceivedAck = 0
+        self.receivedDupAcks = 0
         self.receivedAcks = 0
         self.sentSegments = 0
 
@@ -90,10 +99,10 @@ class SenderManager():
 
 
     def sendPLSegment(self, clientAddress):
-        print("============================")
-        print("Acquired lock for sending!")
-        self.lock.acquire()
+        # print("============================")
+        # print("Acquired lock for sending!")
         # Checks if we sent all segments in window
+        self.lock.acquire()
         while self.segmentsToSendIndex < self.windowEnd:
             segmentPayload = self.getCurrentSegment()
             try:
@@ -103,48 +112,73 @@ class SenderManager():
                     payload=segmentPayload,
                     length=len(segmentPayload)
                 )
-                self.sendSegment(PTPsegement, clientAddress)
-                if self.packetLoss == False:
-                    self.packetLossSequence = self.sequenceNumber
+
+                if (random.random() > self.pdrop):
+                    print("Sent segment")
+                    self.sendSegment(PTPsegement, clientAddress)
+                    if self.packetLoss == False:
+                        self.packetLossSequence = self.sequenceNumber
+                else:
+                    print("Dropped segment")
+                    if self.packetLoss == False:
+                        self.packetLossSequence = self.sequenceNumber
+                        self.packetLoss = True
+                print("Sequence Number: ", self.sequenceNumber)
+                print()
                 # self.incrementSequenceNumber(len(segmentPayload))
             finally:
-                print("Sent segment")
-                print("Sequence Number: ", self.sequenceNumber)
+                # print("Sent segment")
+                
                 print(segmentPayload)
                 print()
                 self.segmentsToSendIndex += 1
+                self.sentSegments += 1
                 self.incrementSequenceNumber(len(segmentPayload))
-        print("Released lock for sending!")
-        print("============================")
         self.lock.release()
+        # print("Released lock for sending!")
+        # print("============================")
+        # self.hasSentWindow = True
+        
 
     def receivePLSegment(self):
-        print("============================")
-        print("Acquired lock for receiving!")
+        # print("============================")
+        # print("Acquired lock for receiving!")
         self.lock.acquire()
         try:
+            if self.receivedAcks < self.sentSegments:
             # message, senderAddress = senderSocket.recvfrom(2048)
-            ackSegment = self.receiveSegment()
-            self.receivedAcks += 1
-            self.windowStart += 1
-            self.windowEnd = min(self.windowEnd + 1, len(self.segmentsToSend))
-            # sManager.addLogAction(
-            #     senderLogFileEntry(
-            #         "rcv",
-            #         round(time.time() - startTime, 6),
-            #         "A",
-            #         ackSegment['sequenceNumber'],
-            #         0,
-            #         ackSegment['acknowledgementNumber']
-            #     )
-            # )
+                lastAck = self.lastReceivedAck
+                ackSegment = self.receiveSegment()
+                print("Last received ACK: ", self.lastReceivedAck)
+                print("Received ACK: ", ackSegment['acknowledgementNumber'])
+                print()
+                # Checks if acknowledgement is the same
+                if int(ackSegment['acknowledgementNumber']) > lastAck:
+                    self.lastReceivedAck = int(ackSegment['acknowledgementNumber'])
+                else:
+                    self.receivedDupAcks += 1
+
+                self.receivedAcks += 1
+                self.windowStart += 1
+                self.windowEnd = min(self.windowEnd + 1, len(self.segmentsToSend))
+                # sManager.addLogAction(
+                #     senderLogFileEntry(
+                #         "rcv",
+                #         round(time.time() - startTime, 6),
+                #         "A",
+                #         ackSegment['sequenceNumber'],
+                #         0,
+                #         ackSegment['acknowledgementNumber']
+                #     )
+                # )
         except:
+            self.sentSegments = self.windowStart
             self.segmentsToSendIndex = self.windowStart
             self.packetLoss = False
             self.sequenceNumber = self.packetLossSequence
         finally:
-            print("Released lock for receiving!")
-            print("============================")
+            # print("Released lock for receiving!")
+            # print("============================")
             self.lock.release()
 
     def receiveSegment(self):

@@ -27,7 +27,7 @@ seedNumber = int(sys.argv[8])
 
 clientAddress = (receiverIP, receiverPort)
 
-sManager = SenderManager(fileToSend, MSS, MWS)
+sManager = SenderManager(fileToSend, MSS, MWS, seedNumber, pdrop)
 
 random.seed(seedNumber)
 
