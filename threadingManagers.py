@@ -19,6 +19,7 @@ class SenderManager():
 
         self.sock = None
         self.clientAddress = None
+        self.timer = None
 
         self.senderLogActions = ""
         self.senderLogFile = open("Sender_log.txt", "w")
@@ -35,9 +36,10 @@ class SenderManager():
         self.hasSentWindow = False
 
         self.lastReceivedAck = 0
-        self.receivedDupAcks = 0
+        self.receivedDupAcks = 1
         self.receivedAcks = 0
         self.sentSegments = 0
+        self.sentNonDroppedSegments = 0
 
         with open(fileToSend, "r") as f:
             payload = f.read(MSS)
@@ -48,14 +50,7 @@ class SenderManager():
             f.close() 
 
         self.windowEnd = min(MWS, len(self.segmentsToSend))
-    # def increment(self):
-    #     self.lock.acquire()
-    #     try:
-    #         print("Acquired a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-    #         self.segmentsToSendIndex += 3
-    #     finally:
-    #         print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-    #         self.lock.release()
+
     def addLogAction(self, entry):
         self.senderLogActions += entry
 
@@ -63,13 +58,11 @@ class SenderManager():
         self.sock = socket(AF_INET, SOCK_DGRAM)
         self.sock.bind((serverIP, serverPort))
         self.sock.settimeout(timer / 1000)
+        self.timer = timer
 
     def getCurrentSegment(self):
         return self.segmentsToSend[self.segmentsToSendIndex]
 
-    # def addSegmentToSend(self, segment):
-    #     self.segmentsToSend.append(segment)
-    
     def incrementSequenceNumber(self, increment):
         self.sequenceNumber += increment
 
@@ -82,27 +75,12 @@ class SenderManager():
     def setAcknowledgementNumber(self, newAcknowledgementNumber):
         self.acknowledgementNumber = newAcknowledgementNumber
 
-    # def decrement(self):
-    #     print("Decrementing")
-    #     print("Waiting for lock")
-    #     self.lock.acquire()
-    #     try:
-    #         print("Acquired a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-    #         self.segmentsToSendIndex -= 1
-    #     finally:
-    #         print("Released a lock, segmentsToSendIdx value: ", self.segmentsToSendIndex)
-    #         self.lock.release()
-
-
     def sendSegment(self, segment, clientAddress):
 
         self.sock.sendto(segment, clientAddress)
 
 
     def sendPLSegment(self, clientAddress):
-        # print("============================")
-        # print("Acquired lock for sending!")
-        # Checks if we sent all segments in window
         self.lock.acquire()
         while self.segmentsToSendIndex < self.windowEnd:
             segmentPayload = self.getCurrentSegment()
@@ -117,6 +95,7 @@ class SenderManager():
                 if (random.random() > self.pdrop):
                     print("Sent segment")
                     self.sendSegment(PTPsegement, clientAddress)
+                    self.sentNonDroppedSegments += 1
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
                 else:
@@ -127,9 +106,7 @@ class SenderManager():
                         self.packetLossIndex = self.segmentsToSendIndex
                 print("Sequence Number: ", self.sequenceNumber)
                 print()
-                # self.incrementSequenceNumber(len(segmentPayload))
             finally:
-                # print("Sent segment")
                 
                 print(segmentPayload)
                 print()
@@ -137,14 +114,9 @@ class SenderManager():
                 self.sentSegments += 1
                 self.incrementSequenceNumber(len(segmentPayload))
         self.lock.release()
-        # print("Released lock for sending!")
-        # print("============================")
-        # self.hasSentWindow = True
         
 
     def receivePLSegment(self):
-        # print("============================")
-        # print("Acquired lock for receiving!")
         self.lock.acquire()
         try:
             # Only receive segments if they are sent
@@ -154,11 +126,27 @@ class SenderManager():
                 print("Last received ACK: ", self.lastReceivedAck)
                 print("Received ACK: ", ackSegment['acknowledgementNumber'])
                 print()
+                self.sentNonDroppedSegments -= 1
                 # Checks if acknowledgement is the same
                 if int(ackSegment['acknowledgementNumber']) > lastAck:
+                    
                     self.lastReceivedAck = int(ackSegment['acknowledgementNumber'])
                 else:
                     self.receivedDupAcks += 1
+
+                # Discard remaining ack segments and revert back to lost packet
+                if self.receivedDupAcks == 3:
+                    print("RECEIVED DUP ACKS")
+
+                    while (self.sentNonDroppedSegments > 0):
+                        self.sock.settimeout(None)
+                        self.receiveSegment()
+                        self.sentNonDroppedSegments -= 1
+                        print("Successfully dropped non dropped segment, ", self.sentNonDroppedSegments)
+                    raise Exception
+                print("REMAINING NON-DROPPED, ", self.sentNonDroppedSegments)
+                print("PACKET LOSS INDEX ", self.packetLossIndex)
+                print()
 
                 self.receivedAcks += 1
                 self.windowStart += 1
@@ -175,6 +163,9 @@ class SenderManager():
                 # )
         # If we timeout, revert back to the start of window
         except:
+            self.sock.settimeout(self.timer / 1000)
+            self.sentNonDroppedSegments = 0
+            self.receivedDupAcks = 1
             self.sentSegments = self.packetLossIndex
             self.receivedAcks = self.packetLossIndex
             self.segmentsToSendIndex = self.packetLossIndex
@@ -199,30 +190,18 @@ class SenderManager():
         self.senderLogFile.close()
         self.sock.close()
 
-def sendSegment(s):
 
-    for i in range(5):
-        s.increment()
-    print("Done")
+# if __name__ == '__main__':
 
-def cancelSegment(s):
+#     sManager = SenderManager()
 
-    for i in range(5):
-        s.decrement()
-    print("Done")
+#     t1 = threading.Thread(target=sendSegment, args=(sManager,))
+#     t1.start()
 
+#     t2 = threading.Thread(target=cancelSegment, args=(sManager,))
+#     t2.start()
 
-if __name__ == '__main__':
+#     t1.join()
+#     t2.join()
 
-    sManager = SenderManager()
-
-    t1 = threading.Thread(target=sendSegment, args=(sManager,))
-    t1.start()
-
-    t2 = threading.Thread(target=cancelSegment, args=(sManager,))
-    t2.start()
-
-    t1.join()
-    t2.join()
-
-    print("Final IDX number: ", sManager.segmentsToSendIndex)
+#     print("Final IDX number: ", sManager.segmentsToSendIndex)
