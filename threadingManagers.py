@@ -59,7 +59,7 @@ class SenderManager():
                 self.totalDataTransferred += len(payload)
             f.close() 
 
-        self.windowEnd = min(MWS, len(self.segmentsToSend))
+        self.windowEnd = min(MWS / MSS, len(self.segmentsToSend))
 
     def addLogAction(self, entry):
         self.senderLogActions += entry
@@ -116,6 +116,7 @@ class SenderManager():
                     # print("Sent segment")
                     self.sendSegment(PTPsegement, clientAddress, len(segmentPayload), 'D')
                     self.sentNonDroppedSegments += 1
+                    # print("Sent segment")
 
                     # self.addLogAction(
                     #     senderLogFileEntry(
@@ -153,6 +154,7 @@ class SenderManager():
                 
                 # print(segmentPayload)
                 # print()
+                # print('============')
                 self.segmentsToSendIndex += 1
                 self.sentSegments += 1
                 self.incrementSequenceNumber(len(segmentPayload))
@@ -163,6 +165,7 @@ class SenderManager():
         self.lock.acquire()
         try:
             # Only receive segments if they are sent
+            # print(selfself.sentSegments)
             if self.receivedAcks < self.sentSegments:
                 lastAck = self.lastReceivedAck
                 ackSegment = self.receiveSegment('A')
@@ -179,10 +182,18 @@ class SenderManager():
                 # print("Last received ACK: ", self.lastReceivedAck)
                 # print("Received ACK: ", ackSegment['acknowledgementNumber'])
                 # print()
+                # print("HERE")
                 self.sentNonDroppedSegments -= 1
                 # Checks if acknowledgement is the same
+
+
+
                 if int(ackSegment['acknowledgementNumber']) > lastAck:
                     self.lastReceivedAck = int(ackSegment['acknowledgementNumber'])
+
+                    self.receivedAcks += 1
+                    self.windowStart += 1
+                    self.windowEnd = min(self.windowEnd + 1, len(self.segmentsToSend))
                 else:
                     self.totalDuplicateAcks += 1
                     self.receivedDupAcks += 1
@@ -192,7 +203,7 @@ class SenderManager():
                     # print("RECEIVED DUP ACKS")
 
                     while (self.sentNonDroppedSegments > 0):
-                        self.sock.settimeout(None)
+                        # self.sock.settimeout(None)
                         self.receiveSegment('A')
                         self.sentNonDroppedSegments -= 1
                         self.totalDuplicateAcks += 1
@@ -202,12 +213,8 @@ class SenderManager():
                 # print("PACKET LOSS INDEX ", self.packetLossIndex)
                 # print()
 
-                self.receivedAcks += 1
-                self.windowStart += 1
-                self.windowEnd = min(self.windowEnd + 1, len(self.segmentsToSend))
 
         except:
-            self.sock.settimeout(self.timer / 1000)
             self.sentNonDroppedSegments = 0
             self.receivedDupAcks = 1
             self.sentSegments = self.packetLossIndex
@@ -222,6 +229,7 @@ class SenderManager():
 
     def receiveSegment(self, flag):
         try:
+            self.sock.settimeout(self.timer / 1000)
             message, clientAddress = self.sock.recvfrom(2048)
             segment = json.loads(message.decode('utf-8'))
             self.lastReceivedAck = int(segment['acknowledgementNumber'])

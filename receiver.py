@@ -34,6 +34,8 @@ startTime = time.time()
 
 totalDataReceived = 0
 totalDataSegmentsReceived = 0
+prevAck = 0
+prevAckCounter = 0
 
 # Sends SYN-ACK segment
 if segment['syn'] == 1:
@@ -75,7 +77,7 @@ receiveLogActions += senderLogFileEntry(
 if segment['ack'] == 1:
     allowSending = True
     sequenceNumber += 1
-
+    prevAck = acknowledgementNumber
     
     # print("A connection has been established with " + str(senderAddress))
     # print()
@@ -87,6 +89,7 @@ if segment['ack'] == 1:
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
     segment = json.loads(message.decode('utf-8'))
+
     # print("Received segment")
     # print(segment)
     # print("==================")
