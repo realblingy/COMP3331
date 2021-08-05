@@ -34,6 +34,7 @@ startTime = time.time()
 
 totalDataReceived = 0
 totalDataSegmentsReceived = 0
+totalDuplicateSegmentsReceived = 0
 prevAck = 0
 prevAckCounter = 0
 
@@ -88,6 +89,7 @@ if segment['ack'] == 1:
 # Receive segments
 while 1:
     message, senderAddress = clientSocket.recvfrom(2048)
+    print(segment['sequenceNumber'])
     segment = json.loads(message.decode('utf-8'))
 
     # print("Received segment")
@@ -128,12 +130,15 @@ while 1:
             acknowledgementNumber
         )
 
+        totalDataReceived = len(contents)
+
         receiveLogActions += "\n=====================================================\n"
         receiveLogActions += f"Amount of data received: {totalDataReceived}\n"
         receiveLogActions += f"Number of data segments received: {totalDataSegmentsReceived}\n"
-
+        receiveLogActions += f"Number of duplicate segments received: {totalDuplicateSegmentsReceived}"
 
         fileReceived.write(contents)
+        
 
         # print("Closing socket");
         receiverLogFile.write(receiveLogActions)
@@ -156,7 +161,8 @@ while 1:
         acknowledgementNumber += int(segment['length'])
         contents += segment['payload']
         totalDataSegmentsReceived += 1
-        totalDataReceived += int(segment['length'])
+    else:
+        totalDuplicateSegmentsReceived += 1
         # print("Received segment")
         # print(segment)
         # print()

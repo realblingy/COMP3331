@@ -48,6 +48,7 @@ class SenderManager():
         self.totalDataSegmentsSent = 0
         self.totalPacketsDropped = 0
         self.totalDuplicateAcks = 0
+        self.totalDuplicateSegments = 0
 
         with open(fileToSend, "r") as f:
             payload = f.read(MSS)
@@ -55,8 +56,9 @@ class SenderManager():
                 self.totalDataSegmentsSent += 1
                 # sManager.addSegmentToSend(payload)
                 self.segmentsToSend.append(payload)
-                payload = f.read(MSS)
                 self.totalDataTransferred += len(payload)
+                payload = f.read(MSS)
+                
             f.close() 
 
         self.windowEnd = min(MWS / MSS, len(self.segmentsToSend))
@@ -116,7 +118,7 @@ class SenderManager():
                     # print("Sent segment")
                     self.sendSegment(PTPsegement, clientAddress, len(segmentPayload), 'D')
                     self.sentNonDroppedSegments += 1
-                    # print("Sent segment")
+                    print("Sent segment")
 
                     # self.addLogAction(
                     #     senderLogFileEntry(
@@ -131,8 +133,10 @@ class SenderManager():
 
                     if self.packetLoss == False:
                         self.packetLossSequence = self.sequenceNumber
+                    else:
+                        self.totalDuplicateSegments += 1
                 else:
-                    # print("Dropped segment")
+                    print("Dropped segment")
                     self.totalPacketsDropped += 1
                     self.addLogAction(
                         senderLogFileEntry(
@@ -148,8 +152,8 @@ class SenderManager():
                         self.packetLossSequence = self.sequenceNumber
                         self.packetLoss = True
                         self.packetLossIndex = self.segmentsToSendIndex
-                # print("Sequence Number: ", self.sequenceNumber)
-                # print()
+                print("Sequence Number: ", self.sequenceNumber)
+                print()
             finally:
                 
                 # print(segmentPayload)
@@ -253,7 +257,9 @@ class SenderManager():
         self.senderLogFile.write(f"Total data transferred: {self.totalDataTransferred}\n")
         self.senderLogFile.write(f"Number of data segments sent: {self.totalDataSegmentsSent}\n")
         self.senderLogFile.write(f"Number of (all) Packets Dropped (by the PL module): {self.totalPacketsDropped}\n")
+        self.senderLogFile.write(f"Number of retransmitted segments: {self.totalDuplicateSegments}\n")
         self.senderLogFile.write(f"Number of duplicate acknowledgements received: {self.totalDuplicateAcks}\n")
+        
 
         self.senderLogFile.close()
         self.sock.close()
