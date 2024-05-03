@@ -1,6 +1,7 @@
 # PTP Protocol
+A Python application to simulate TCP but has congestion control removed. All of this code was built from scratch and no code duplication from other resources.
 
-**How it works**: Uses the same principles as TCP but its main application is to transfer data without congestion control. 
+Utilises multithreading as well.
 
 **What is implemented**: 
 
@@ -10,4 +11,3 @@
 -  Packet loss simulator
 - Logs of packets sent (like Wireshark)
 
-***SCORED FULL MARKS***
